@@ -10,7 +10,6 @@ from .const import DOMAIN, CONF_SENSORS, AVAILABLE_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Die XML-Tags, nach denen im zentralen Koordinator-Baum gesucht werden soll
 TARGET_TAGS = {
     "system_unit_software_version": "Version",
     "status_peripherals_connected": "ConnectedDevices",
@@ -45,7 +44,7 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
     """Repräsentiert einen Cisco Sensor, gekoppelt an den zentralen Koordinator."""
 
     def __init__(self, coordinator, sensor_key, entry: ConfigEntry):
-        """Initialisiert den Sensor, verknüpft ihn mit dem Koordinator und dem Gerät."""
+        """Initialisiert den Sensor und verknüpft ihn mit dem Koordinator."""
         super().__init__(coordinator)
         self._sensor_key = sensor_key
         self._host = coordinator.host
@@ -79,24 +78,25 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Verknüpft alle Sensoren zu einem einzigen, gemeinsamen Gerät in Home Assistant."""
+        """Verknüpft alle Sensoren zu einem einzigen, gemeinsamen Gerät."""
+        # WICHTIG: Die Domain MUSS exakt 'cisco_device_control' lauten,
+        # damit Home Assistant die Entitäten dem richtigen Gerät zuordnet.
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"Cisco Video System ({self._host})",
+            name=f"Cisco Desk Pro ({self._host})",
             manufacturer="Cisco",
-            model="RoomOS Device (Desk Pro)",
+            model="Webex RoomOS Device",
             configuration_url=f"https://{self._host}",
         )
 
     @property
     def state(self):
-        """Liest den Zustand aus dem XML. Fehlt der Knoten im Standby, bleibt der alte Wert erhalten."""
+        """Liest den Zustand aus dem XML."""
         if self.coordinator.data is None:
             return self._last_valid_value
 
         target_tag = TARGET_TAGS.get(self._sensor_key)
         
-        # Lokale XML-Suche ohne Netzwerk-Last
         for elem in self.coordinator.data.iter():
             if elem.tag == target_tag:
                 if elem.text and elem.text.strip():
