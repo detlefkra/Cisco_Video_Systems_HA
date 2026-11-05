@@ -1,0 +1,10 @@
+{
+  "domain": "cisco_video_system",
+  "name": "Cisco Video System",
+  "codeowners": ["@dein-github-name"],
+  "config_flow": true,
+  "documentation": "https://github.com",
+  "iot_class": "local_polling",
+  "version": "1.0.0",
+  "requirements": []
+}
