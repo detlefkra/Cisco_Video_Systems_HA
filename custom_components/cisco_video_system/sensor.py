@@ -51,6 +51,7 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         
         self._name = f"Cisco {AVAILABLE_SENSORS[sensor_key]}"
         self._unique_id = f"cisco_{self._host}_{sensor_key}"
+        self._last_valid_value = "Warte auf Update..."
 
         # Einheiten-Zuweisung
         self._attr_device_class = None
@@ -76,16 +77,20 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def state(self):
-        """Liest den Zustand direkt aus dem vom Koordinator frisch geholten XML-Baum."""
+        """Liest den Zustand aus dem XML. Fehlt der Knoten im Standby, bleibt der alte Wert erhalten."""
         if self.coordinator.data is None:
-            return "Keine Daten"
+            return self._last_valid_value
 
         target_tag = TARGET_TAGS.get(self._sensor_key)
         
-        # Lokale XML-Suche (verursacht 0 Netzwerk-Last!)
+        # Lokale XML-Suche ohne Netzwerk-Last
         for elem in self.coordinator.data.iter():
             if elem.tag == target_tag:
                 if elem.text and elem.text.strip():
-                    return elem.text.strip()
+                    # Sichere den gefundenen Wert im lokalen Speicher
+                    self._last_valid_value = elem.text.strip()
+                    return self._last_valid_value
 
-        return "Nicht im XML gefunden"
+        # WICHTIG: Wenn die Verbindung (HTTP 200) erfolgreich war, das Cisco-Gerät aber 
+        # das XML-Tag im Standby ausblendet, behalten wir einfach lautlos den letzten bekannten Wert.
+        return self._last_valid_value
