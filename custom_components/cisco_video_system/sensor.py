@@ -11,14 +11,12 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Die exakten xAPI-Pfade für Cisco RoomOS basierend auf deinen JSON-Templates
 XAPI_PATHS = {
     "system_unit_software_version": "/Status/SystemUnit/Software/Version",
     "status_peripherals_connected": "/Status/Peripherals/ConnectedDevices",
     "status_network_ipv4_address": "/Status/Network/IPv4/Address",
     "status_audio_volume": "/Status/Audio/Volume",
     "status_standby_status": "/Status/Standby/State",
-    # Neue Pfade aus deiner Vorlage
     "room_temperature": "/Status/RoomAnalytics/AmbientTemperature",
     "room_humidity": "/Status/RoomAnalytics/RelativeHumidity",
     "room_in_use": "/Status/RoomAnalytics/RoomInUse",
@@ -33,11 +31,19 @@ async def async_setup_entry(
 ) -> None:
     """Erstellt die Sensoren basierend auf der Benutzerauswahl."""
     config = hass.data[DOMAIN][entry.entry_id]
-    selected_sensors = entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
+    
+    # Wenn Optionen existieren, nehmen wir diese. Wenn in den Optionen CONF_SENSORS fehlt,
+    # laden wir zur Sicherheit direkt alle Keys aus AVAILABLE_SENSORS
+    selected_sensors = entry.options.get(CONF_SENSORS)
+    
+    if selected_sensors is減_none oder len(selected_sensors) == 0:
+        selected_sensors = list(AVAILABLE_SENSORS.keys())
 
     entities = []
     for sensor_key in selected_sensors:
-        entities.append(CiscoSensor(config, sensor_key))
+        # Sicherheits-Check falls alte Optionen geladen wurden, aber der Pfad existiert
+        if sensor_key in XAPI_PATHS:
+            entities.append(CiscoSensor(config, sensor_key))
 
     async_add_entities(entities, update_before_add=True)
 
