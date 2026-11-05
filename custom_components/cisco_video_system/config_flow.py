@@ -10,11 +10,11 @@ class CiscoVideoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def _test_credentials(self, host, username, password):
-        """Hier würde die echte API-Validierung stattfinden."""
-        # Optional: Sende einen Test-Request an f"http://{host}/jsxapi"
+        """Test-Funktion für die Credentials."""
         return True
 
-    async def ]_async_step_user(self, user_input=None):
+    async def async_step_user(self, user_input=None):
+        """Erster Schritt bei der Einrichtung."""
         errors = {}
         if user_input is not None:
             valid = await self._test_credentials(
@@ -48,7 +48,6 @@ class CiscoVideoOptionsFlowHandler(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # Aktuell ausgewählte Sensoren oder alle als Standard
         current_sensors = self.config_entry.options.get(
             CONF_SENSORS, list(AVAILABLE_SENSORS.keys())
         )
