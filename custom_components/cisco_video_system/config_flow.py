@@ -21,7 +21,12 @@ class CiscoVideoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_HOST], user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
             )
             if valid:
-                return self.async_create_entry(title=f"Cisco {user_input[CONF_HOST]}", data=user_input)
+                # WICHTIG: Wir schreiben alle Sensoren direkt als initiale Optionen in die DB!
+                return self.async_create_entry(
+                    title=f"Cisco {user_input[CONF_HOST]}", 
+                    data=user_input,
+                    options={CONF_SENSORS: list(AVAILABLE_SENSORS.keys())}
+                )
             else:
                 errors["base"] = "auth_error"
 
@@ -46,24 +51,15 @@ class CiscoVideoOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         """Initiiert den Optionsschritt."""
         if user_input is not None:
-            # Speichert die neuen Sensor-Haken direkt ab
             return self.async_create_entry(title="", data=user_input)
 
-        # Holt die gespeicherten Sensoren ab
-        stored_sensors = self.config_entry.options.get(CONF_SENSORS, [])
-
-        # DYNAMISCHER ABGLEICH:
-        # Wir filtern die Liste, sodass nur noch Schlüssel verwendet werden,
-        # die HEUTE auch wirklich in const.py existieren.
+        # Holt die gespeicherten Optionen ab, Fallback auf alle Sensoren
+        stored_sensors = self.config_entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
         current_sensors = [sns for sns in stored_sensors if sns in AVAILABLE_SENSORS]
 
-        # Wenn die Liste nach dem Filtern leer ist oder die Integration neu ist,
-        # wählen wir automatisch alle Sensoren als Standard aus.
         if not current_sensors:
             current_sensors = list(AVAILABLE_SENSORS.keys())
 
-        # Das Schema wird jedes Mal neu aufgebaut, cv.multi_select MUSS die 
-        # Schlüssel aus AVAILABLE_SENSORS anzeigen.
         OPTIONS_SCHEMA = vol.Schema({
             vol.Required(
                 CONF_SENSORS, 
