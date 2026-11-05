@@ -51,7 +51,7 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"Cisco API {self.host}",
-            update_interval=timedelta(seconds=30),
+            update_interval=timedelta(seconds=60),
         )
 
     async def _async_update_data(self):
@@ -62,7 +62,7 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         try:
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                timeout = aiohttp.ClientTimeout(total=10)
+                timeout = aiohttp.ClientTimeout(total=20)
                 async with session.get(url, auth=auth, timeout=timeout) as response:
                     if response.status == 200:
                         xml_data = await response.text()
