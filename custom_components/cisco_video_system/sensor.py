@@ -36,7 +36,7 @@ async def async_setup_entry(
     # Holt die ausgewählten Sensoren aus den Optionen
     selected_sensors = entry.options.get(CONF_SENSORS)
     
-    # Falls keine Optionen gespeichert sind oder die Liste leer ist, laden wir alle
+    # KORREKTUR: Saubere Python-Syntax ohne Sonderzeichen/Übersetzungsfehler
     if selected_sensors is None or len(selected_sensors) == 0:
         selected_sensors = list(AVAILABLE_SENSORS.keys())
 
