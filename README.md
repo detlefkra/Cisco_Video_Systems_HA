@@ -1,7 +1,5 @@
 # Cisco Video System Integration for Home Assistant
 
-[![hacs_badge]([https://shields.io](https://brands.home-assistant.io/_/marketplace//logo.png))](https://github.com)
-
 Diese HACS-Integration ermöglicht die Diagnose und Steuerung von Cisco Videosystemen (RoomOS / Webex Devices) über die lokale Cisco HTTP-API.
 
 ## Features
