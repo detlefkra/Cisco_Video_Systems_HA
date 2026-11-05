@@ -46,7 +46,7 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         self.username = entry.data["username"]
         self.password = entry.data["password"]
         
-        # Abfrage alle 30 Sekunden schont die Ressourcen des Cisco-Systems vollständig
+        # ÄNDERUNG 1: Intervall auf 60 Sekunden erhöhen, um die API zu entlasten
         super().__init__(
             hass,
             _LOGGER,
@@ -62,6 +62,7 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         try:
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
+                # ÄNDERUNG 2: Timeout auf 20 Sekunden hochsetzen
                 timeout = aiohttp.ClientTimeout(total=20)
                 async with session.get(url, auth=auth, timeout=timeout) as response:
                     if response.status == 200:
