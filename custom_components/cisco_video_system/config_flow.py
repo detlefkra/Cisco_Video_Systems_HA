@@ -10,11 +10,11 @@ class CiscoVideoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def _test_credentials(self, host, username, password):
-        """Test-Funktion für die Credentials."""
+        """Test-Funktion für die Credentials (wird beim Hinzufügen aufgerufen)."""
         return True
 
     async def async_step_user(self, user_input=None):
-        """Erster Schritt bei der Einrichtung."""
+        """Erster Schritt bei der Einrichtung der Integration."""
         errors = {}
         if user_input is not None:
             valid = await self._test_credentials(
@@ -36,7 +36,7 @@ class CiscoVideoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
-        """Erstellt den Options Flow Handler."""
+        """Erstellt den Options Flow Handler für das 'Konfigurieren'-Menü."""
         return CiscoVideoOptionsFlowHandler()
 
 
@@ -44,19 +44,19 @@ class CiscoVideoOptionsFlowHandler(config_entries.OptionsFlow):
     """Erlaubt das Ändern der ausgewählten Sensoren im Nachhinein."""
 
     async def async_step_init(self, user_input=None):
-        """Initiiert den Optionsschritt und zeigt dynamisch alle verfügbaren Optionen."""
+        """Initiiert den Optionsschritt und stellt die Sensorauswahl bereit."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # Holt die aktuell aktivierten Sensoren aus den Optionen
+        # Holt die aktuell aktivierten Sensoren aus den gespeicherten Optionen
         current_sensors = self.config_entry.options.get(CONF_SENSORS, [])
         
-        # Falls die Liste leer ist (z.B. nach Erstinstallation), wählen wir alle verfuggbaren Sensoren aus
+        # Falls die Liste leer ist (z. B. direkt nach dem Update), wählen wir alle verfügbaren Sensoren aus
         if not current_sensors:
             current_sensors = list(AVAILABLE_SENSORS.keys())
 
-        # WICHTIG: Das Schema zeigt cv.multi_select immer basierend auf AVAILABLE_SENSORS an,
-        # somit tauchen neue Sensoren aus const.py garantiert im UI auf.
+        # Das Schema greift immer live auf AVAILABLE_SENSORS aus const.py zu.
+        # Dadurch tauchen neue Sensoren garantiert in der Liste auf.
         OPTIONS_SCHEMA = vol.Schema({
             vol.Required(
                 CONF_SENSORS, 
