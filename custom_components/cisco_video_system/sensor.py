@@ -42,7 +42,7 @@ class CiscoSensor(SensorEntity):
         """Holt Daten direkt vom Cisco-System via HTTP JSON-API."""
         # Cisco RoomOS nutzt standardmäßig die HTTP-API unter /status.xml oder /getxml
         # Für JSON-Daten wird oft die /jsxapi Endpunkt verwendet.
-        url = f"http://{self._host}/status.xml" 
+        url = f"https://{self._host}/status.xml" 
         auth = aiohttp.BasicAuth(self._username, self._password)
 
         try:
