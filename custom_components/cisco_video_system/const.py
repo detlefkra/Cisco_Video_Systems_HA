@@ -1,4 +1,4 @@
-DOMAIN = "cisco_video_system"
+DOMAIN = "cisco_devide_control"
 
 CONF_HOST = "host"
 CONF_USERNAME = "username"
