@@ -55,7 +55,9 @@ class CiscoSensor(SensorEntity):
         if not xpath:
             return
 
-        # Wir nutzen den getxml-Endpunkt für gezielte Abfragen
+        # Letztes Element des Pfades extrahieren (z. B. "Volume" aus "/Status/Audio/Volume")
+        target_tag = xpath.split("/")[-1]
+
         url = f"https://{self._host}/getxml?location={xpath}" 
         auth = aiohttp.BasicAuth(self._username, self._password)
 
@@ -68,20 +70,14 @@ class CiscoSensor(SensorEntity):
                             xml_data = await response.text()
                             root = ET.fromstring(xml_data)
                             
-                            # Da getxml nur die Zielstruktur liefert, iterieren wir durch,
-                            # bis wir das tiefste Element mit Inhalt finden.
-                            value = None
-                            for elem in root.iter():
-                                if elem.text and not elem.text.strip() == "":
-                                    # Verhindert, dass wir aus Versehen Whitespaces/Zeilenumbrüche parsen
-                                    text_clean = elem.text.strip()
-                                    if text_clean:
-                                        value = text_clean
-
-                            if value is not None:
-                                self._attr_state = value
+                            # Suche gezielt nach dem Ziel-Tag (z. B. <Volume> oder <Version>)
+                            target_element = root.find(f".//{target_tag}")
+                            
+                            if target_element is not None and target_element.text is not None:
+                                self._attr_state = target_element.text.strip()
                             else:
-                                self._attr_state = "Unbekannt"
+                                self._attr_state = "Nicht verfügbar"
+                                _LOGGER.debug("Tag %s in der API-Antwort nicht gefunden", target_tag)
                         else:
                             self._attr_state = f"API Fehler ({response.status})"
         except Exception as e:
