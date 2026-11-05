@@ -44,16 +44,19 @@ class CiscoVideoOptionsFlowHandler(config_entries.OptionsFlow):
     """Erlaubt das Ändern der ausgewählten Sensoren im Nachhinein."""
 
     async def async_step_init(self, user_input=None):
-        """Initiiert den Optionsschritt."""
+        """Initiiert den Optionsschritt und zeigt dynamisch alle verfügbaren Optionen."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # HINWEIS: self.config_entry wird jetzt automatisch von Home Assistant bereitgestellt.
-        # Wir greifen direkt auf die bereits gespeicherten Optionen zu.
-        current_sensors = self.config_entry.options.get(
-            CONF_SENSORS, list(AVAILABLE_SENSORS.keys())
-        )
+        # Holt die aktuell aktivierten Sensoren aus den Optionen
+        current_sensors = self.config_entry.options.get(CONF_SENSORS, [])
+        
+        # Falls die Liste leer ist (z.B. nach Erstinstallation), wählen wir alle verfuggbaren Sensoren aus
+        if not current_sensors:
+            current_sensors = list(AVAILABLE_SENSORS.keys())
 
+        # WICHTIG: Das Schema zeigt cv.multi_select immer basierend auf AVAILABLE_SENSORS an,
+        # somit tauchen neue Sensoren aus const.py garantiert im UI auf.
         OPTIONS_SCHEMA = vol.Schema({
             vol.Required(
                 CONF_SENSORS, 
