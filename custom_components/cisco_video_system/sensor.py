@@ -20,7 +20,7 @@ TARGET_TAGS = {
     "room_humidity": "RelativeHumidity",
     "room_in_use": "RoomInUse",
     "room_presence": "PeoplePresence",
-    "room_noise": "A", # Das tiefste Element unter AmbientNoise/Level/A
+    "room_noise": "A",
     "room_people_count": "Current",
     "status_call_status": "NumberOfActiveCalls"
 }
@@ -82,7 +82,7 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
 
         target_tag = TARGET_TAGS.get(self._sensor_key)
         
-        # Rekursive Suche im lokal gespeicherten XML-Baum (verursacht 0 Last!)
+        # Lokale XML-Suche (verursacht 0 Netzwerk-Last!)
         for elem in self.coordinator.data.iter():
             if elem.tag == target_tag:
                 if elem.text and elem.text.strip():
