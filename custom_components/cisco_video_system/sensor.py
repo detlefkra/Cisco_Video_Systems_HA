@@ -4,6 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, CONF_SENSORS, AVAILABLE_SENSORS
 
@@ -35,7 +36,7 @@ async def async_setup_entry(
     entities = []
     for sensor_key in selected_sensors:
         if sensor_key in TARGET_TAGS:
-            entities.append(CiscoSensor(coordinator, sensor_key))
+            entities.append(CiscoSensor(coordinator, sensor_key, entry))
 
     async_add_entities(entities)
 
@@ -43,11 +44,12 @@ async def async_setup_entry(
 class CiscoSensor(CoordinatorEntity, SensorEntity):
     """Repräsentiert einen Cisco Sensor, gekoppelt an den zentralen Koordinator."""
 
-    def __init__(self, coordinator, sensor_key):
-        """Initialisiert den Sensor und verknüpft ihn mit dem Koordinator."""
+    def __init__(self, coordinator, sensor_key, entry: ConfigEntry):
+        """Initialisiert den Sensor, verknüpft ihn mit dem Koordinator und dem Gerät."""
         super().__init__(coordinator)
         self._sensor_key = sensor_key
         self._host = coordinator.host
+        self._entry = entry
         
         self._name = f"Cisco {AVAILABLE_SENSORS[sensor_key]}"
         self._unique_id = f"cisco_{self._host}_{sensor_key}"
@@ -76,6 +78,17 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         return self._unique_id
 
     @property
+    def device_info(self) -> DeviceInfo:
+        """Verknüpft alle Sensoren zu einem einzigen, gemeinsamen Gerät in Home Assistant."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name=f"Cisco Video System ({self._host})",
+            manufacturer="Cisco",
+            model="RoomOS Device (Desk Pro)",
+            configuration_url=f"https://{self._host}",
+        )
+
+    @property
     def state(self):
         """Liest den Zustand aus dem XML. Fehlt der Knoten im Standby, bleibt der alte Wert erhalten."""
         if self.coordinator.data is None:
@@ -87,10 +100,7 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         for elem in self.coordinator.data.iter():
             if elem.tag == target_tag:
                 if elem.text and elem.text.strip():
-                    # Sichere den gefundenen Wert im lokalen Speicher
                     self._last_valid_value = elem.text.strip()
                     return self._last_valid_value
 
-        # WICHTIG: Wenn die Verbindung (HTTP 200) erfolgreich war, das Cisco-Gerät aber 
-        # das XML-Tag im Standby ausblendet, behalten wir einfach lautlos den letzten bekannten Wert.
         return self._last_valid_value
