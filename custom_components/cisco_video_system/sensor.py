@@ -11,6 +11,7 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
+# Die exakten xAPI-Pfade für Cisco RoomOS basierend auf deinen JSON-Templates
 XAPI_PATHS = {
     "system_unit_software_version": "/Status/SystemUnit/Software/Version",
     "status_peripherals_connected": "/Status/Peripherals/ConnectedDevices",
@@ -32,16 +33,15 @@ async def async_setup_entry(
     """Erstellt die Sensoren basierend auf der Benutzerauswahl."""
     config = hass.data[DOMAIN][entry.entry_id]
     
-    # Wenn Optionen existieren, nehmen wir diese. Wenn in den Optionen CONF_SENSORS fehlt,
-    # laden wir zur Sicherheit direkt alle Keys aus AVAILABLE_SENSORS
+    # Holt die ausgewählten Sensoren aus den Optionen
     selected_sensors = entry.options.get(CONF_SENSORS)
     
-    if selected_sensors is減_none oder len(selected_sensors) == 0:
+    # Falls keine Optionen gespeichert sind oder die Liste leer ist, laden wir alle
+    if selected_sensors is None or len(selected_sensors) == 0:
         selected_sensors = list(AVAILABLE_SENSORS.keys())
 
     entities = []
     for sensor_key in selected_sensors:
-        # Sicherheits-Check falls alte Optionen geladen wurden, aber der Pfad existiert
         if sensor_key in XAPI_PATHS:
             entities.append(CiscoSensor(config, sensor_key))
 
