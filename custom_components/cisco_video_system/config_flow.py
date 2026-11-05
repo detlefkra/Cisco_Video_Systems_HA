@@ -35,19 +35,21 @@ class CiscoVideoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
-        return CiscoVideoOptionsFlowHandler(config_entry)
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> config_entries.OptionsFlow:
+        """Erstellt den Options Flow Handler."""
+        return CiscoVideoOptionsFlowHandler()
 
 
 class CiscoVideoOptionsFlowHandler(config_entries.OptionsFlow):
     """Erlaubt das Ändern der ausgewählten Sensoren im Nachhinein."""
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
+        """Initiiert den Optionsschritt."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
+        # HINWEIS: self.config_entry wird jetzt automatisch von Home Assistant bereitgestellt.
+        # Wir greifen direkt auf die bereits gespeicherten Optionen zu.
         current_sensors = self.config_entry.options.get(
             CONF_SENSORS, list(AVAILABLE_SENSORS.keys())
         )
