@@ -1,7 +1,7 @@
 import logging
 import xml.etree.ElementTree as ET
 import aiohttp
-import async_timeout
+import asyncio
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,14 +12,14 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Die exakten xAPI-Pfade für Cisco RoomOS
+# Die korrigierten und offiziellen xAPI-Pfade für Cisco RoomOS (z.B. Desk Pro)
 XAPI_PATHS = {
     "system_unit_software_version": "/Status/SystemUnit/Software/Version",
     "status_peripherals_connected": "/Status/Peripherals/ConnectedDevices",
     "status_network_ipv4_address": "/Status/Network/IPv4/Address",
     "status_call_status": "/Status/SystemUnit/State/NumberOfActiveCalls",
     "status_audio_volume": "/Status/Audio/Volume",
-    "status_standby_status": "/Status/SystemUnit/State/Standby/Status"
+    "status_standby_status": "/Status/Standby/State"  # Korrigiert für RoomOS 11
 }
 
 async def async_setup_entry(
@@ -47,39 +47,58 @@ class CiscoSensor(SensorEntity):
         
         self._attr_name = f"Cisco {AVAILABLE_SENSORS[sensor_key]}"
         self._attr_unique_id = f"cisco_{self._host}_{sensor_key}"
-        self._attr_state = None
+        self._attr_state = "Initialisierung..."
 
     async def async_update(self) -> None:
         """Holt gezielt den gefilterten Wert vom Cisco-System via HTTPS."""
         xpath = XAPI_PATHS.get(self._sensor_key)
         if not xpath:
+            self._attr_state = "Fehlerhafter Pfad"
             return
 
-        # Letztes Element des Pfades extrahieren (z. B. "Volume" aus "/Status/Audio/Volume")
-        target_tag = xpath.split("/")[-1]
-
-        url = f"https://{self._host}/getxml?location={xpath}" 
+        url = f"https://{self._host}/getxml?location={xpath}"
         auth = aiohttp.BasicAuth(self._username, self._password)
 
         try:
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                with async_timeout.timeout(5):
-                    async with session.get(url, auth=auth) as response:
-                        if response.status == 200:
-                            xml_data = await response.text()
-                            root = ET.fromstring(xml_data)
-                            
-                            # Suche gezielt nach dem Ziel-Tag (z. B. <Volume> oder <Version>)
-                            target_element = root.find(f".//{target_tag}")
-                            
-                            if target_element is not None and target_element.text is not None:
-                                self._attr_state = target_element.text.strip()
-                            else:
-                                self._attr_state = "Nicht verfügbar"
-                                _LOGGER.debug("Tag %s in der API-Antwort nicht gefunden", target_tag)
+                # Timeout direkt über aiohttp steuern (verhindert Kompatibilitätsprobleme mit async_timeout)
+                async with session.get(url, auth=auth, timeout=5) as response:
+                    if response.status == 200:
+                        xml_data = await response.text()
+                        
+                        if not xml_data.strip():
+                            self._attr_state = "Leere API Antwort"
+                            return
+
+                        root = ET.fromstring(xml_data)
+                        
+                        # Definiere das gesuchte Ziel-Tag (z. B. "Version" oder "State")
+                        target_tag = xpath.split("/")[-1]
+                        
+                        # Suche rekursiv im gesamten XML-Baum nach dem Element
+                        found_element = None
+                        for elem in root.iter():
+                            if elem.tag == target_tag:
+                                found_element = elem
+                                break
+                        
+                        if found_element is not None and found_element.text is not None:
+                            self._attr_state = found_element.text.strip()
                         else:
-                            self._attr_state = f"API Fehler ({response.status})"
+                            # Falls das Tag nicht existiert, nimm den ersten verfügbaren Textwert (Fallback)
+                            fallback_value = None
+                            for elem in root.iter():
+                                if elem.text and elem.text.strip():
+                                    fallback_value = elem.text.strip()
+                            
+                            self._attr_state = fallback_value if fallback_value else "Wert nicht im XML"
+                    else:
+                        self._attr_state = f"HTTP {response.status}"
+        except asyncio.TimeoutError:
+            self._attr_state = "Timeout (Verbindung lahm)"
+        except ET.ParseError:
+            self._attr_state = "XML Parsing Fehler"
         except Exception as e:
-            _LOGGER.error("Fehler beim Abruf von %s für %s: %s", xpath, self._host, e)
-            self._attr_state = "Nicht erreichbar"
+            _LOGGER.error("Fehler bei Cisco Update (%s): %s", self._sensor_key, e)
+            self._attr_state = "Verbindungsfehler"
