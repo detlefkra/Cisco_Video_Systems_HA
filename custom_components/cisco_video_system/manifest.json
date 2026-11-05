@@ -1,4 +1,4 @@
-cisco_videoo_system{
+cisco_video_system{
   "domain": "cisco_video_system",
   "name": "Cisco Video System",
   "codeowners": ["@dein-github-name"],
