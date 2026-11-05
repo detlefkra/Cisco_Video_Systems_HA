@@ -1,0 +1,7 @@
+{
+  "name": "Cisco Video System",
+  "type": "integration",
+  "manifest": "custom_components/cisco_video_system/manifest.json",
+  "homeassistant": "2024.1.0",
+  "render_readme": true
+}
