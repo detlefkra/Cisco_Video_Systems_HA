@@ -1,5 +1,8 @@
 import logging
+import xml.etree.ElementTree as ET
 import aiohttp
+import async_timeout
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -9,13 +12,22 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
+# Mapping der Sensoren auf die exakten XML-Pfade der Cisco RoomOS status.xml
+XML_PATHS = {
+    "system_unit_software_version": "SystemUnit/Software/Version",
+    "status_peripherals_connected": "Peripherals/ConnectedDevices",
+    "status_network_ipv4_address": "Network/IPv4/Address",
+    "status_call_status": "SystemUnit/State/NumberOfActiveCalls",
+    "status_audio_volume": "Audio/Volume",
+    "status_standby_status": "SystemUnit/State/Standby/Status"
+}
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Erstellt die Sensoren basierend auf der Benutzerauswahl."""
     config = hass.data[DOMAIN][entry.entry_id]
     
-    # Nutze ausgewählte Sensoren aus den Optionen, falls vorhanden, sonst alle
     selected_sensors = entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
 
     entities = []
@@ -39,28 +51,34 @@ class CiscoSensor(SensorEntity):
         self._attr_state = None
 
     async def async_update(self) -> None:
-        """Holt Daten direkt vom Cisco-System via HTTP JSON-API."""
-        # Cisco RoomOS nutzt standardmäßig die HTTP-API unter /status.xml oder /getxml
-        # Für JSON-Daten wird oft die /jsxapi Endpunkt verwendet.
+        """Holt Daten direkt vom Cisco-System via HTTPS XML-API."""
+        # Auf HTTPS umgestellt, da dein System auf Port 443 lauscht
         url = f"https://{self._host}/status.xml" 
         auth = aiohttp.BasicAuth(self._username, self._password)
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, auth=auth, timeout=5) as response:
-                    if response.status == 200:
-                        # Dummy-Logik: Hier parst du das XML/JSON basierend auf self._sensor_key
-                        # Beispiel für einen echten Payload-Abruf:
-                        # data = await response.json()
-                        
-                        if self._sensor_key == "status_standby_status":
-                            self._attr_state = "Standby"  # Beispielwert
-                        elif self._sensor_key == "status_call_status":
-                            self._attr_state = "Idle"
+            # WICHTIG: Hier erlauben wir selbstsignierte Zertifikate (ssl=False)
+            connector = aiohttp.TCPConnector(ssl=False)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                with async_timeout.timeout(10):
+                    async with session.get(url, auth=auth) as response:
+                        if response.status == 200:
+                            xml_data = await response.text()
+                            
+                            # XML parsen
+                            root = ET.fromstring(xml_data)
+                            
+                            # Suchpfad für diesen spezifischen Sensor holen
+                            xpath = XML_PATHS.get(self._sensor_key)
+                            element = root.find(xpath)
+                            
+                            if element is not None and element.text is not None:
+                                self._attr_state = element.text
+                            else:
+                                self._attr_state = "Nicht verfügbar"
+                                _LOGGER.debug("Pfad %s im XML nicht gefunden", xpath)
                         else:
-                            self._attr_state = "Verbunden"
-                    else:
-                        self._attr_state = "API Error"
+                            self._attr_state = f"API Fehler ({response.status})"
         except Exception as e:
             _LOGGER.error("Fehler beim Abruf der Cisco API für %s: %s", self._host, e)
             self._attr_state = "Nicht erreichbar"
