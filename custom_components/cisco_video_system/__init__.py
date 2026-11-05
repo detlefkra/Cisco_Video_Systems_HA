@@ -16,7 +16,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Setzt die Integration über einen Config Entry auf."""
     hass.data.setdefault(DOMAIN, {})
 
-    # Erstelle den zentralen Koordinator für den Cisco-Abruf
     coordinator = CiscoDataCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
@@ -47,7 +46,7 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         self.username = entry.data["username"]
         self.password = entry.data["password"]
         
-        # Aktualisierung alle 30 Sekunden (schont das Cisco-System)
+        # Abfrage alle 30 Sekunden schont die Ressourcen des Cisco-Systems vollständig
         super().__init__(
             hass,
             _LOGGER,
@@ -56,22 +55,20 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
-        """Holt das schlanke gefilterte Status-XML in einem einzigen Rutsch."""
-        # Wir holen direkt die beiden Hauptknoten im XML, das spart massiv Last
-        url = f"https://{self.host}/getxml?location=/Status/SystemUnit&location=/Status/Peripherals&location=/Status/Audio&location=/Status/Standby&location=/Status/RoomAnalytics"
+        """Holt den gesamten Status-Baum in einem einzigen, akkuschonenden Aufruf."""
+        url = f"https://{self.host}/getxml?location=/Status"
         auth = aiohttp.BasicAuth(self.username, self.password)
 
         try:
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                timeout = aiohttp.ClientTimeout(total=10) # Großzügiges Timeout
+                timeout = aiohttp.ClientTimeout(total=10)
                 async with session.get(url, auth=auth, timeout=timeout) as response:
                     if response.status == 200:
                         xml_data = await response.text()
                         if not xml_data.strip():
                             raise UpdateFailed("Leere Antwort von Cisco API")
                         
-                        # Gib das geparste XML-Wurzelelement an die Sensoren weiter
                         return ET.fromstring(xml_data)
                     else:
                         raise UpdateFailed(f"HTTP Fehler {response.status}")
