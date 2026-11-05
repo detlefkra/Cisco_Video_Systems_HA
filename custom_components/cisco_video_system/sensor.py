@@ -12,14 +12,14 @@ from .const import DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWORD, CONF_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
-# Mapping der Sensoren auf die exakten XML-Pfade der Cisco RoomOS status.xml
-XML_PATHS = {
-    "system_unit_software_version": "SystemUnit/Software/Version",
-    "status_peripherals_connected": "Peripherals/ConnectedDevices",
-    "status_network_ipv4_address": "Network/IPv4/Address",
-    "status_call_status": "SystemUnit/State/NumberOfActiveCalls",
-    "status_audio_volume": "Audio/Volume",
-    "status_standby_status": "SystemUnit/State/Standby/Status"
+# Die exakten xAPI-Pfade für Cisco RoomOS
+XAPI_PATHS = {
+    "system_unit_software_version": "/Status/SystemUnit/Software/Version",
+    "status_peripherals_connected": "/Status/Peripherals/ConnectedDevices",
+    "status_network_ipv4_address": "/Status/Network/IPv4/Address",
+    "status_call_status": "/Status/SystemUnit/State/NumberOfActiveCalls",
+    "status_audio_volume": "/Status/Audio/Volume",
+    "status_standby_status": "/Status/SystemUnit/State/Standby/Status"
 }
 
 async def async_setup_entry(
@@ -27,7 +27,6 @@ async def async_setup_entry(
 ) -> None:
     """Erstellt die Sensoren basierend auf der Benutzerauswahl."""
     config = hass.data[DOMAIN][entry.entry_id]
-    
     selected_sensors = entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
 
     entities = []
@@ -51,34 +50,40 @@ class CiscoSensor(SensorEntity):
         self._attr_state = None
 
     async def async_update(self) -> None:
-        """Holt Daten direkt vom Cisco-System via HTTPS XML-API."""
-        # Auf HTTPS umgestellt, da dein System auf Port 443 lauscht
-        url = f"https://{self._host}/status.xml" 
+        """Holt gezielt den gefilterten Wert vom Cisco-System via HTTPS."""
+        xpath = XAPI_PATHS.get(self._sensor_key)
+        if not xpath:
+            return
+
+        # Wir nutzen den getxml-Endpunkt für gezielte Abfragen
+        url = f"https://{self._host}/getxml?location={xpath}" 
         auth = aiohttp.BasicAuth(self._username, self._password)
 
         try:
-            # WICHTIG: Hier erlauben wir selbstsignierte Zertifikate (ssl=False)
             connector = aiohttp.TCPConnector(ssl=False)
             async with aiohttp.ClientSession(connector=connector) as session:
-                with async_timeout.timeout(10):
+                with async_timeout.timeout(5):
                     async with session.get(url, auth=auth) as response:
                         if response.status == 200:
                             xml_data = await response.text()
-                            
-                            # XML parsen
                             root = ET.fromstring(xml_data)
                             
-                            # Suchpfad für diesen spezifischen Sensor holen
-                            xpath = XML_PATHS.get(self._sensor_key)
-                            element = root.find(xpath)
-                            
-                            if element is not None and element.text is not None:
-                                self._attr_state = element.text
+                            # Da getxml nur die Zielstruktur liefert, iterieren wir durch,
+                            # bis wir das tiefste Element mit Inhalt finden.
+                            value = None
+                            for elem in root.iter():
+                                if elem.text and not elem.text.strip() == "":
+                                    # Verhindert, dass wir aus Versehen Whitespaces/Zeilenumbrüche parsen
+                                    text_clean = elem.text.strip()
+                                    if text_clean:
+                                        value = text_clean
+
+                            if value is not None:
+                                self._attr_state = value
                             else:
-                                self._attr_state = "Nicht verfügbar"
-                                _LOGGER.debug("Pfad %s im XML nicht gefunden", xpath)
+                                self._attr_state = "Unbekannt"
                         else:
                             self._attr_state = f"API Fehler ({response.status})"
         except Exception as e:
-            _LOGGER.error("Fehler beim Abruf der Cisco API für %s: %s", self._host, e)
+            _LOGGER.error("Fehler beim Abruf von %s für %s: %s", xpath, self._host, e)
             self._attr_state = "Nicht erreichbar"
