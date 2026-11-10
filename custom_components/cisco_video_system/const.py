@@ -20,5 +20,5 @@ AVAILABLE_SENSORS = {
     "room_people_count": "Personen",
     "status_call_status": "Active Calls",
     "lightning_conditions": "Lighting Conditions",
-    "camra_lid": "Camera Klappe"
+    "camera_lid": "Camera Klappe"
 }
