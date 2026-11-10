@@ -3,9 +3,10 @@
 Diese HACS-Integration ermöglicht die Diagnose und Steuerung von Cisco Videosystemen (RoomOS / Webex Devices) über die lokale Cisco HTTP-API.
 
 ## Features
-- **Einfache Einrichtung:** Anmeldedaten und IP-Adresse direkt über die Home Assistant Benutzeroberfläche (Config Flow) eingeben.
-- **Dynamische Sensorauswahl:** Wähle über die Integrationsoptionen flexibel aus, welche Diagnose- und Statuswerte als Sensoren angelegt werden sollen.
-- **Lokale Steuerung:** Keine Cloud erforderlich, die Abfrage erfolgt direkt über dein lokales Netzwerk.
+- **Einfache Einrichtung:** Anmeldedaten und IP-Adresse direkt über die Benutzeroberfläche (Config Flow) eingeben.
+- **Dynamische Sensorauswahl:** Flexible Auswahl von Diagnose- und Statuswerten als Sensoren.
+- **Lokale Steuerung:** Sende Befehle wie Anrufen, Auflegen, Stummschalten, Lautstärkeanpassung und Standby-Steuerung direkt über Home-Assistant-Dienste.
+- **Lokale Sicherheit:** Vollständig lokal ohne Cloud-Anbindung.
 
 ## Installation
 
