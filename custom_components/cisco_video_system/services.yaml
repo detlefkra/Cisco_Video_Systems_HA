@@ -1,1 +1,45 @@
+dial:
+  name: Anruf tätigen (Dial)
+  description: Ruft eine SIP-Adresse oder Nummer auf dem Cisco System an.
+  fields:
+    target:
+      name: Ziel
+      description: Die SIP-Adresse oder Telefonnummer (z. B. raum@firma.de).
+      required: true
+      selector:
+        text:
+
+disconnect:
+  name: Anruf beenden (Disconnect)
+  description: Beendet den aktuellen aktiven Anruf.
+
+mute:
+  name: Mikrofone stummschalten (Mute)
+  description: Schaltet die Mikrofone des Systems stumm.
+
+unmute:
+  name: Stummschaltung aufheben (Unmute)
+  description: Hebt die Stummschaltung der Mikrofone auf.
+
+set_volume:
+  name: Lautstärke ändern
+  description: Setzt die Systemlautstärke auf einen bestimmten Wert.
+  fields:
+    volume:
+      name: Lautstärke
+      description: Wert zwischen 0 und 100.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+
+standby_activate:
+  name: Standby aktivieren
+  description: Versetzt das Videosystem in den Standby-Modus.
+
+standby_deactivate:
+  name: System aufwecken
+  description: Holt das System aus dem Standby-Modus.
 
