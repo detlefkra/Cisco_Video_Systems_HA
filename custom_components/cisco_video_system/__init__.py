@@ -46,12 +46,12 @@ class CiscoDataCoordinator(DataUpdateCoordinator):
         self.username = entry.data["username"]
         self.password = entry.data["password"]
         
-        # Intervall auf 60 Sekunden erhöht, um die Cisco-API maximal zu entlasten
+        # Intervall auf 30 Sekunden 
         super().__init__(
             hass,
             _LOGGER,
             name=f"Cisco API {self.host}",
-            update_interval=timedelta(seconds=60),
+            update_interval=timedelta(seconds=30),
         )
 
     async def _async_update_data(self):
