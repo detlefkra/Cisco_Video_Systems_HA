@@ -1,15 +1,20 @@
+"""Sensor-Plattform für das Cisco Video System mit allen Original-Sensoren."""
 import logging
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+import xml.etree.ElementTree as ET
+import aiohttp
+
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN, CONF_SENSORS, AVAILABLE_SENSORS
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-# Präzise XPath-Unterpfade basierend auf der XML-Struktur (ohne das Root-Element <Status>)
+# Deine originalen Sensor-Pfade (Exakt beibehalten)
 TARGET_PATHS = {
     "system_unit_software_version": "SystemUnit/Software/Version",
     "status_peripherals_connected": "Cameras/Camera/Connected",  
@@ -27,81 +32,103 @@ TARGET_PATHS = {
     "camera_lid": "SystemUnit/State/CameraLid"
 }
 
+# Menschlich lesbare Namen und Icons für deine alten Sensoren
+SENSOR_META = {
+    "system_unit_software_version": {"name": "Software Version", "icon": "mdi:cloud-download"},
+    "status_peripherals_connected": {"name": "Kamera verbunden", "icon": "mdi:video"},
+    "status_network_ipv4_address": {"name": "IPv4 Adresse", "icon": "mdi:lan"},
+    "status_audio_volume": {"name": "Lautstärke Status", "icon": "mdi:volume-high"},
+    "status_standby_status": {"name": "Standby Status", "icon": "mdi:power-sleep"},
+    "room_temperature": {"name": "Raumtemperatur", "icon": "mdi:thermometer"},
+    "room_humidity": {"name": "Luftfeuchtigkeit", "icon": "mdi:water-percent"},
+    "room_in_use": {"name": "Raum belegt", "icon": "mdi:door-closed-lock"},
+    "room_presence": {"name": "Präsenz erkannt", "icon": "mdi:account-group"},
+    "room_noise": {"name": "Umgebungsgeräusch", "icon": "mdi:ear-hearing"},
+    "room_people_count": {"name": "Anzahl Personen", "icon": "mdi:account-badge"},
+    "status_call_status": {"name": "Aktive Anrufe", "icon": "mdi:phone-in-talk"},
+    "lightning_conditions": {"name": "Lichtverhältnisse", "icon": "mdi:white-balance-sunny"},
+    "camera_lid": {"name": "Kameraabdeckung", "icon": "mdi:eye-off"}
+}
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Erstellt die Sensoren basierend auf dem zentralen Koordinator."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-    selected_sensors = entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
-    
+    """Setzt alle originalen Cisco Sensor-Entitäten auf."""
+    data = hass.data[DOMAIN][entry.entry_id]
+    host = data["host"]
+
     entities = []
-    for sensor_key in selected_sensors:
-        if sensor_key in TARGET_PATHS:
-            entities.append(CiscoSensor(coordinator, sensor_key, entry))
-            
-    async_add_entities(entities)
+    # Erstellt für jeden deiner alten Pfade eine eigene Entität
+    for key, xpath in TARGET_PATHS.items():
+        meta = SENSOR_META.get(key, {"name": key.replace("_", " ").title(), "icon": "mdi:eye"})
+        entities.append(CiscoStaticSensor(hass, entry, host, key, xpath, meta))
 
-class CiscoSensor(CoordinatorEntity, SensorEntity):
-    """Repräsentiert einen Cisco Sensor, gekoppelt an den zentralen Koordinator."""
+    async_add_entities(entities, update_before_add=True)
 
-    def __init__(self, coordinator, sensor_key, entry: ConfigEntry):
-        """Initialisiert den Sensor und verknüpft ihn mit dem Koordinator."""
-        super().__init__(coordinator)
-        self._sensor_key = sensor_key
-        self._host = coordinator.host
+
+class CiscoStaticSensor(SensorEntity):
+    """Repräsentiert einen der originalen Cisco Statussensoren."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, host: str, key: str, xpath: str, meta: dict):
+        """Initialisiert den Sensor."""
+        self.hass = hass
         self._entry = entry
-        # "Cisco" Präfix wurde hier entfernt:
-        self._name = AVAILABLE_SENSORS[sensor_key]
-        self._unique_id = f"cisco_{self._host}_{sensor_key}"
-        self._last_valid_value = "Warte auf Update..."
-
-        # Einheiten-Zuweisung
-        self._attr_device_class = None
-        self._attr_native_unit_of_measurement = None
+        self._host = host
+        self._key = key
+        self._xpath = xpath
         
-        if sensor_key == "room_temperature":
-            self._attr_device_class = SensorDeviceClass.TEMPERATURE
+        self._attr_name = f"Cisco {meta['name']}"
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_icon = meta["icon"]
+        self._attr_native_value = None
+
+        # Maßeinheiten für Klima-Werte hinzufügen
+        if "temperature" in key:
             self._attr_native_unit_of_measurement = "°C"
-        elif sensor_key == "room_humidity":
-            self._attr_device_class = SensorDeviceClass.HUMIDITY
+        elif "humidity" in key:
             self._attr_native_unit_of_measurement = "%"
-        elif sensor_key == "room_noise":
-            self._attr_device_class = SensorDeviceClass.SOUND_PRESSURE
+        elif "noise" in key:
             self._attr_native_unit_of_measurement = "dBA"
 
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def unique_id(self) -> str:
-        return self._unique_id
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Verknüpft alle Sensoren zu einem einzigen, gemeinsamen Gerät."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._entry.entry_id)},
-            name=f"Cisco Desk Pro ({self._host})",
+        # DAS bindet den Sensor an die gemeinsame Geräteseite mit den Buttons
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"Cisco Video System ({host})",
             manufacturer="Cisco",
-            model="Webex RoomOS Device",
-            configuration_url=f"https://{self._host}",
+            model="RoomOS Device",
         )
 
-    @property
-    def native_value(self):
-        """Liest den exakten Wert über den XPath-Unterpfad aus dem XML."""
-        if self.coordinator.data is None:
-            return self._last_valid_value
-
-        target_path = TARGET_PATHS.get(self._sensor_key)
+    async def async_update(self) -> None:
+        """Holt den aktuellen Wert über die Cisco /getxml Schnittstelle."""
+        session = async_get_clientsession(self.hass)
         
-        try:
-            elem = self.coordinator.data.find(target_path)
-            if elem is not None and elem.text is not None and elem.text.strip():
-                self._last_valid_value = elem.text.strip()
-                return self._last_valid_value
-        except Exception as e:
-            _LOGGER.error("Fehler beim Parsen des XML-Pfads %s: %s", target_path, e)
+        cleaned_host = self._host
+        if not cleaned_host.startswith(("http://", "https://")):
+            cleaned_host = f"https://{cleaned_host}"
+            
+        # Wir fragen gezielt nach dem spezifischen Status-Ast im XML
+        url = f"{cleaned_host.rstrip('/')}/getxml?location=/Status/{self._xpath}"
+        
+        username = self._entry.data.get("username")
+        password = self._entry.data.get("password")
+        auth = aiohttp.BasicAuth(username, password)
 
-        return self._last_valid_value
+        try:
+            async with session.get(url, auth=auth, ssl=False, timeout=10) as response:
+                if response.status == 200:
+                    xml_text = await response.text()
+                    root = ET.fromstring(xml_text)
+                    
+                    # Extrahiert den XML-Knoten-Tag am Ende (z.B. "Current" oder "Version")
+                    target_tag = self._xpath.split("/")[-1]
+                    element = root.find(f".//{target_tag}")
+                    
+                    if element is not None and element.text is not None:
+                        self._attr_native_value = element.text
+                    else:
+                        self._attr_native_value = None
+                else:
+                    _LOGGER.error("Fehler beim Abfragen von %s. Status: %s", self._xpath, response.status)
+                    
+        except Exception as err:
+            _LOGGER.error("Verbindungsfehler beim Update von %s: %s", self._key, err)
