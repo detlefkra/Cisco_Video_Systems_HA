@@ -33,7 +33,7 @@ TARGET_PATHS = {
     "camera_lid": "SystemUnit/State/CameraLid"
 }
 
-# Menschlich lesbare Namen und Icons für deine alten Sensoren
+# Menschlich lesbare Namen und Icons für deine alten Sensoren (OHNE führendes Cisco)
 SENSOR_META = {
     "system_unit_software_version": {"name": "Software Version", "icon": "mdi:cloud-download"},
     "status_peripherals_connected": {"name": "Kamera verbunden", "icon": "mdi:video"},
@@ -66,7 +66,6 @@ async def async_setup_entry(
     for key in TARGET_PATHS.keys():
         if key not in selected_sensors:
             unique_id = f"{entry.entry_id}_{key}"
-            # Findet die Entitäts-ID anhand der Unique ID
             entity_id = ent_reg.async_get_entity_id("sensor", DOMAIN, unique_id)
             if entity_id:
                 _LOGGER.info("Entferne abgewählten Sensor: %s", entity_id)
@@ -86,6 +85,9 @@ async def async_setup_entry(
 class CiscoConfigurableSensor(SensorEntity):
     """Repräsentiert einen über den Konfigurations-Button gewählten Sensor."""
 
+    # Aktiviert die moderne Namensauflösung relativ zum Gerät
+    _attr_has_entity_name = True
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, host: str, key: str, xpath: str, meta: dict):
         """Initialisiert den Sensor."""
         self.hass = hass
@@ -94,7 +96,8 @@ class CiscoConfigurableSensor(SensorEntity):
         self._key = key
         self._xpath = xpath
         
-        self._attr_name = f"Cisco {meta['name']}"
+        # KORREKTUR: "Cisco" aus dem Namen entfernt, da Home Assistant das Gerät vorschaltet
+        self._attr_name = meta['name']
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_icon = meta["icon"]
         self._attr_native_value = None
