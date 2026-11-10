@@ -8,9 +8,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
-_LOGGER = logging.getLogger(__name__)
+# Sicherer Import von DOMAIN und optional PLATFORMS aus der const.py
+try:
+    from .const import DOMAIN, PLATFORMS
+except ImportError:
+    from .const import DOMAIN
+    # Falls PLATFORMS in const.py fehlt, definieren wir es hier lokal (Standard für Sensoren)
+    PLATFORMS = ["sensor"]
 
-DOMAIN = "cisco_video_system"
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Setzt die Cisco Video System Integration aus einem Config Entry auf."""
@@ -20,13 +26,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     
-    # Hier folgt dein bestehender Code für Plattform-Setup (Sensor, etc.)
-    # hass.async_create_task(hass.config_entries.async_forward_entry_setups(entry, ["sensor"]))
+    # Weiterleitung an die Sensor-Plattformen (falls vorhanden)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Hilfsfunktion zum Senden der XML-Befehle an /putxml
     async def send_xcommand(xml_payload: str):
         session = async_get_clientsession(hass)
-        url = f"https://{host}/putxml" if not host.startswith(("http://", "https://")) else f"{host}/putxml"
+        
+        # Sicherstellen, dass die URL korrekt formatiert ist
+        cleaned_host = host
+        if not cleaned_host.startswith(("http://", "https://")):
+            cleaned_host = f"https://{cleaned_host}"
+        url = f"{cleaned_host.rstrip('/')}/putxml"
         
         auth = aiohttp.BasicAuth(username, password)
         headers = {"Content-Type": "text/xml"}
@@ -87,8 +98,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Entfernt einen Config Entry und deregistriert Dienste."""
-    # Optionale Logik zum Entfernen der Services bei Deaktivierung
-    for service in ["dial", "disconnect", "mute", "unmute", "set_volume", "standby_activate", "standby_deactivate"]:
-        hass.services.async_remove(DOMAIN, service)
-    return True
+    """Entfernt einen Config Entry und deregistriert Dienste sowie Plattformen."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    
+    if unload_ok:
+        for service in ["dial", "disconnect", "mute", "unmute", "set_volume", "standby_activate", "standby_deactivate"]:
+            if hass.services.has_service(DOMAIN, service):
+                hass.services.async_remove(DOMAIN, service)
+                
+    return unload_ok
