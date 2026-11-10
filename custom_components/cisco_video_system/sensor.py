@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 # Präzise XPath-Unterpfade basierend auf der XML-Struktur (ohne das Root-Element <Status>)
 TARGET_PATHS = {
     "system_unit_software_version": "SystemUnit/Software/Version",
-    "status_peripherals_connected": "Cameras/Camera/Connected",  # Beispielhaft für Kamera-Verbindung
+    "status_peripherals_connected": "Cameras/Camera/Connected",  
     "status_network_ipv4_address": "Network/IPv4/Address",
     "status_audio_volume": "Audio/Volume",
     "status_standby_status": "Standby/State",
@@ -48,7 +48,8 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         self._sensor_key = sensor_key
         self._host = coordinator.host
         self._entry = entry
-        self._name = f"Cisco {AVAILABLE_SENSORS[sensor_key]}"
+        # "Cisco" Präfix wurde hier entfernt:
+        self._name = AVAILABLE_SENSORS[sensor_key]
         self._unique_id = f"cisco_{self._host}_{sensor_key}"
         self._last_valid_value = "Warte auf Update..."
 
@@ -94,7 +95,6 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         target_path = TARGET_PATHS.get(self._sensor_key)
         
         try:
-            # Da coordinator.data das Root-Element <Status> ist, suchen wir ab dort den Unterpfad
             elem = self.coordinator.data.find(target_path)
             if elem is not None and elem.text is not None and elem.text.strip():
                 self._last_valid_value = elem.text.strip()
