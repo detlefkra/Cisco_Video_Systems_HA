@@ -14,10 +14,11 @@ AVAILABLE_SENSORS = {
     "status_standby_status": "Standby-Status",
     "room_temperature": "Temperatur",
     "room_humidity": "Luftfeuchte",
-    "room_in_use": "In Use",
+    "room_in_use": "In Benutzung",
     "room_presence": "Presence",
-    "room_noise": "Noise",
-    "room_people_count": "People",
+    "room_noise": "Lautstärke",
+    "room_people_count": "Personen",
     "status_call_status": "Active Calls",
-    "lightning_conditions": "Lighting Conditions"
+    "lightning_conditions": "Lighting Conditions",
+    "camra_lid": "Camera Klappe"
 }
