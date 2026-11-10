@@ -1,77 +1,52 @@
+"""Die Cisco Video System Integration für Home Assistant."""
 import logging
-import xml.etree.ElementTree as ET
-from datetime import timedelta
-import aiohttp
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from .api import CiscoVideoSystemAPI
+from .const import DOMAIN, PLATFORMS  # Falls PLATFORMS in const.py definiert ist, z. B. ["sensor"]
+from .services import async_setup_services
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = ["sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Setzt die Integration über einen Config Entry auf."""
+    """Richtet das Cisco Video System aus einem Config Entry ein."""
     hass.data.setdefault(DOMAIN, {})
 
-    coordinator = CiscoDataCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    # Holt die geteilte aiohttp-Clientsession von Home Assistant
+    session = async_get_clientsession(hass)
 
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    # Initialisiere die API-Verbindungsklasse mit den Daten aus dem Config Flow
+    api = CiscoVideoSystemAPI(
+        host=entry.data["host"],
+        username=entry.data["username"],
+        password=entry.data["password"],
+        session=session
+    )
 
+    # Speichert die API-Instanz, damit services.py und sensor.py darauf zugreifen können
+    hass.data[DOMAIN][entry.entry_id] = {
+        "api": api
+    }
+
+    # Leitet das Setup an deine Plattformen (z. B. sensor.py) weiter
+    # Falls PLATFORMS in deiner const.py fehlt, kannst du auch ["sensor"] direkt eintragen
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(update_listener))
+
+    # Registriere die neuen Dienste zur Steuerung (Dial, Mute, Volume, Standby etc.)
+    async_setup_services(hass)
+
+    _LOGGER.info("Cisco Video System Integration erfolgreich geladen.")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Entfernt die Integration."""
+    """Entfernt einen Config Entry (wichtig bei Deinstallation/Neustart der Integration)."""
+    # Entfernt die Plattformen
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    
     if unload_ok:
+        # Bereinigt den globalen Speicher
         hass.data[DOMAIN].pop(entry.entry_id)
+
     return unload_ok
-
-async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
-    """Startet die Plattform neu, wenn sich die Sensor-Auswahl ändert."""
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
-class CiscoDataCoordinator(DataUpdateCoordinator):
-    """Zentraler Koordinator, der ALLE Werte mit nur EINEM API-Aufruf holt."""
-
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        self.entry = entry
-        self.host = entry.data["host"]
-        self.username = entry.data["username"]
-        self.password = entry.data["password"]
-        
-        # Intervall auf 30 Sekunden 
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=f"Cisco API {self.host}",
-            update_interval=timedelta(seconds=30),
-        )
-
-    async def _async_update_data(self):
-        """Holt den gesamten Status-Baum in einem einzigen, akkuschonenden Aufruf."""
-        url = f"https://{self.host}/getxml?location=/Status"
-        auth = aiohttp.BasicAuth(self.username, self.password)
-
-        try:
-            connector = aiohttp.TCPConnector(ssl=False)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                # Timeout auf 20 Sekunden hochgesetzt für langsame Standby-Reaktionen
-                timeout = aiohttp.ClientTimeout(total=20)
-                async with session.get(url, auth=auth, timeout=timeout) as response:
-                    if response.status == 200:
-                        xml_data = await response.text()
-                        if not xml_data.strip():
-                            raise UpdateFailed("Leere Antwort von Cisco API")
-                        
-                        return ET.fromstring(xml_data)
-                    else:
-                        raise UpdateFailed(f"HTTP Fehler {response.status}")
-        except Exception as err:
-            raise UpdateFailed(f"Verbindung zu Cisco fehlgeschlagen: {err}")
