@@ -42,16 +42,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.error("Verbindungsfehler zur Cisco API: %s", err)
 
     # Speichern des Befehls-Senders im Integrations-Kontext.
-    # Dadurch können button.py und number.py auf denselben Kommunikationskanal zugreifen.
     hass.data[DOMAIN][entry.entry_id] = {
         "send_command": send_xcommand,
         "host": host
     }
     
+    # WICHTIG: Registriert den Update-Listener für den Konfigurations-Button (OptionsFlow)
+    # Sobald Optionen gespeichert werden, wird 'async_reload_entry' aufgerufen.
+    entry.async_on_unload(entry.add_to_updates_listener(async_reload_entry))
+    
     # Automatisiertes Laden aller registrierten Plattformen (sensor, button, number)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
     return True
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Wird aufgerufen, wenn Optionen im Konfigurations-Button geändert und gespeichert werden."""
+    _LOGGER.debug("Optionen geändert. Integration '%s' wird live neu geladen.", entry.title)
+    await hass.config_entries.async_reload(entry.entry_id)
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Entfernt einen Config Entry und deregistriert alle Plattformen sauber."""
