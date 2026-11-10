@@ -1,4 +1,4 @@
-"""Sensor-Plattform für das Cisco Video System mit allen Original-Sensoren."""
+"""Sensor-Plattform für das Cisco Video System mit konfigurierbaren Original-Sensoren."""
 import logging
 import xml.etree.ElementTree as ET
 import aiohttp
@@ -53,21 +53,28 @@ SENSOR_META = {
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Setzt alle originalen Cisco Sensor-Entitäten auf."""
+    """Setzt die Cisco Sensor-Entitäten basierend auf dem Konfigurationsbutton auf."""
     data = hass.data[DOMAIN][entry.entry_id]
     host = data["host"]
 
+    # Holt die Schlüssel der ausgewählten Sensoren aus den Optionen (z.B. ["room_temperature", "room_noise"])
+    # Falls das Feld leer oder neu ist, werden als Fallback einfach ALLE Sensoren geladen
+    selected_sensors = entry.options.get("selected_sensors", list(TARGET_PATHS.keys()))
+
     entities = []
-    # Erstellt für jeden deiner alten Pfade eine eigene Entität
-    for key, xpath in TARGET_PATHS.items():
-        meta = SENSOR_META.get(key, {"name": key.replace("_", " ").title(), "icon": "mdi:eye"})
-        entities.append(CiscoStaticSensor(hass, entry, host, key, xpath, meta))
+    
+    # Geht alle ausgewählten Sensoren durch und baut sie auf
+    for key in selected_sensors:
+        if key in TARGET_PATHS:
+            xpath = TARGET_PATHS[key]
+            meta = SENSOR_META.get(key, {"name": key.replace("_", " ").title(), "icon": "mdi:eye"})
+            entities.append(CiscoConfigurableSensor(hass, entry, host, key, xpath, meta))
 
     async_add_entities(entities, update_before_add=True)
 
 
-class CiscoStaticSensor(SensorEntity):
-    """Repräsentiert einen der originalen Cisco Statussensoren."""
+class CiscoConfigurableSensor(SensorEntity):
+    """Repräsentiert einen über den Konfigurations-Button gewählten Sensor."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, host: str, key: str, xpath: str, meta: dict):
         """Initialisiert den Sensor."""
@@ -82,7 +89,7 @@ class CiscoStaticSensor(SensorEntity):
         self._attr_icon = meta["icon"]
         self._attr_native_value = None
 
-        # Maßeinheiten für Klima-Werte hinzufügen
+        # Passende Maßeinheiten zuweisen
         if "temperature" in key:
             self._attr_native_unit_of_measurement = "°C"
         elif "humidity" in key:
@@ -90,7 +97,7 @@ class CiscoStaticSensor(SensorEntity):
         elif "noise" in key:
             self._attr_native_unit_of_measurement = "dBA"
 
-        # DAS bindet den Sensor an die gemeinsame Geräteseite mit den Buttons
+        # Bietet die gemeinsame Geräte-Zuordnung
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=f"Cisco Video System ({host})",
@@ -106,7 +113,6 @@ class CiscoStaticSensor(SensorEntity):
         if not cleaned_host.startswith(("http://", "https://")):
             cleaned_host = f"https://{cleaned_host}"
             
-        # Wir fragen gezielt nach dem spezifischen Status-Ast im XML
         url = f"{cleaned_host.rstrip('/')}/getxml?location=/Status/{self._xpath}"
         
         username = self._entry.data.get("username")
@@ -119,7 +125,6 @@ class CiscoStaticSensor(SensorEntity):
                     xml_text = await response.text()
                     root = ET.fromstring(xml_text)
                     
-                    # Extrahiert den XML-Knoten-Tag am Ende (z.B. "Current" oder "Version")
                     target_tag = self._xpath.split("/")[-1]
                     element = root.find(f".//{target_tag}")
                     
