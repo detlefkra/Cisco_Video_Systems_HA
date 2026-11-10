@@ -8,6 +8,16 @@ Diese HACS-Integration ermöglicht die Diagnose und Steuerung von Cisco Videosys
 - **Lokale Steuerung:** Sende Befehle wie Anrufen, Auflegen, Stummschalten, Lautstärkeanpassung und Standby-Steuerung direkt über Home-Assistant-Dienste.
 - **Lokale Sicherheit:** Vollständig lokal ohne Cloud-Anbindung.
 
+## Verfügbare Dienste (Services)
+Nach erfolgreicher Einrichtung stellt diese Integration folgende Dienste zur Mediensteuerung bereit:
+*   `cisco_video_system.dial`: Baut einen Anruf zu einer SIP-Adresse oder Telefonnummer auf (Feld: `target`).
+*   `cisco_video_system.disconnect`: Legt den aktuellen Anruf auf.
+*   `cisco_video_system.mute`: Schaltet die Mikrofone im Raum stumm.
+*   `cisco_video_system.unmute`: Hebt die Stummschaltung auf.
+*   `cisco_video_system.set_volume`: Setzt die Systemlautstärke (Feld: `volume`, Bereich 0–100).
+*   `cisco_video_system.standby_activate`: Schaltet das System in den Standby-Modus.
+*   `cisco_video_system.standby_deactivate`: Weckt das Gerät aus dem Standby auf.
+
 ## Installation
 
 ### Über HACS (Empfohlen)
