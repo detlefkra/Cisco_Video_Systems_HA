@@ -5,24 +5,24 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
-
 from .const import DOMAIN, CONF_SENSORS, AVAILABLE_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
-TARGET_TAGS = {
-    "system_unit_software_version": "Version",
-    "status_peripherals_connected": "ConnectedDevices",
-    "status_network_ipv4_address": "Address",
-    "status_audio_volume": "Volume",
-    "status_standby_status": "State",
-    "room_temperature": "AmbientTemperature",
-    "room_humidity": "RelativeHumidity",
-    "room_in_use": "RoomInUse",
-    "room_presence": "PeoplePresence",
-    "room_noise": "A",
-    "room_people_count": "Current",
-    "status_call_status": "NumberOfActiveCalls"
+# Präzise XPath-Unterpfade basierend auf der XML-Struktur (ohne das Root-Element <Status>)
+TARGET_PATHS = {
+    "system_unit_software_version": "SystemUnit/Software/Version",
+    "status_peripherals_connected": "Cameras/Camera/Connected",  # Beispielhaft für Kamera-Verbindung
+    "status_network_ipv4_address": "Network/IPv4/Address",
+    "status_audio_volume": "Audio/Volume",
+    "status_standby_status": "Standby/State",
+    "room_temperature": "RoomAnalytics/AmbientTemperature",
+    "room_humidity": "RoomAnalytics/RelativeHumidity",
+    "room_in_use": "RoomAnalytics/RoomInUse",
+    "room_presence": "RoomAnalytics/PeoplePresence",
+    "room_noise": "RoomAnalytics/AmbientNoise/Level/A",
+    "room_people_count": "RoomAnalytics/PeopleCount/Current",
+    "status_call_status": "SystemUnit/State/NumberOfActiveCalls"
 }
 
 async def async_setup_entry(
@@ -31,14 +31,13 @@ async def async_setup_entry(
     """Erstellt die Sensoren basierend auf dem zentralen Koordinator."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     selected_sensors = entry.options.get(CONF_SENSORS, list(AVAILABLE_SENSORS.keys()))
-
+    
     entities = []
     for sensor_key in selected_sensors:
-        if sensor_key in TARGET_TAGS:
+        if sensor_key in TARGET_PATHS:
             entities.append(CiscoSensor(coordinator, sensor_key, entry))
-
+            
     async_add_entities(entities)
-
 
 class CiscoSensor(CoordinatorEntity, SensorEntity):
     """Repräsentiert einen Cisco Sensor, gekoppelt an den zentralen Koordinator."""
@@ -49,7 +48,6 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         self._sensor_key = sensor_key
         self._host = coordinator.host
         self._entry = entry
-        
         self._name = f"Cisco {AVAILABLE_SENSORS[sensor_key]}"
         self._unique_id = f"cisco_{self._host}_{sensor_key}"
         self._last_valid_value = "Warte auf Update..."
@@ -57,7 +55,7 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         # Einheiten-Zuweisung
         self._attr_device_class = None
         self._attr_native_unit_of_measurement = None
-
+        
         if sensor_key == "room_temperature":
             self._attr_device_class = SensorDeviceClass.TEMPERATURE
             self._attr_native_unit_of_measurement = "°C"
@@ -79,8 +77,6 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Verknüpft alle Sensoren zu einem einzigen, gemeinsamen Gerät."""
-        # WICHTIG: Die Domain MUSS exakt 'cisco_device_control' lauten,
-        # damit Home Assistant die Entitäten dem richtigen Gerät zuordnet.
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
             name=f"Cisco Desk Pro ({self._host})",
@@ -90,17 +86,20 @@ class CiscoSensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def state(self):
-        """Liest den Zustand aus dem XML."""
+    def native_value(self):
+        """Liest den exakten Wert über den XPath-Unterpfad aus dem XML."""
         if self.coordinator.data is None:
             return self._last_valid_value
 
-        target_tag = TARGET_TAGS.get(self._sensor_key)
+        target_path = TARGET_PATHS.get(self._sensor_key)
         
-        for elem in self.coordinator.data.iter():
-            if elem.tag == target_tag:
-                if elem.text and elem.text.strip():
-                    self._last_valid_value = elem.text.strip()
-                    return self._last_valid_value
+        try:
+            # Da coordinator.data das Root-Element <Status> ist, suchen wir ab dort den Unterpfad
+            elem = self.coordinator.data.find(target_path)
+            if elem is not None and elem.text is not None and elem.text.strip():
+                self._last_valid_value = elem.text.strip()
+                return self._last_valid_value
+        except Exception as e:
+            _LOGGER.error("Fehler beim Parsen des XML-Pfads %s: %s", target_path, e)
 
         return self._last_valid_value
