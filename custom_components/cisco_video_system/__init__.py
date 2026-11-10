@@ -1,52 +1,94 @@
-"""Die Cisco Video System Integration für Home Assistant."""
 import logging
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import xml.etree.ElementTree as ET
+import aiohttp
+import voluptuous as vol
 
-from .api import CiscoVideoSystemAPI
-from .const import DOMAIN, PLATFORMS  # Falls PLATFORMS in const.py definiert ist, z. B. ["sensor"]
-from .services import async_setup_services
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
 _LOGGER = logging.getLogger(__name__)
 
+DOMAIN = "cisco_video_system"
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Richtet das Cisco Video System aus einem Config Entry ein."""
+    """Setzt die Cisco Video System Integration aus einem Config Entry auf."""
     hass.data.setdefault(DOMAIN, {})
+    
+    host = entry.data[CONF_HOST]
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+    
+    # Hier folgt dein bestehender Code für Plattform-Setup (Sensor, etc.)
+    # hass.async_create_task(hass.config_entries.async_forward_entry_setups(entry, ["sensor"]))
 
-    # Holt die geteilte aiohttp-Clientsession von Home Assistant
-    session = async_get_clientsession(hass)
+    # Hilfsfunktion zum Senden der XML-Befehle an /putxml
+    async def send_xcommand(xml_payload: str):
+        session = async_get_clientsession(hass)
+        url = f"https://{host}/putxml" if not host.startswith(("http://", "https://")) else f"{host}/putxml"
+        
+        auth = aiohttp.BasicAuth(username, password)
+        headers = {"Content-Type": "text/xml"}
+        
+        try:
+            async with session.post(url, data=xml_payload, auth=auth, headers=headers, ssl=False) as response:
+                if response.status == 200:
+                    text = await response.text()
+                    _LOGGER.debug("Cisco API Antwort: %s", text)
+                else:
+                    _LOGGER.error("Fehler beim Senden an Cisco API. Status: %s", response.status)
+        except Exception as err:
+            _LOGGER.error("Verbindungsfehler zur Cisco API: %s", err)
 
-    # Initialisiere die API-Verbindungsklasse mit den Daten aus dem Config Flow
-    api = CiscoVideoSystemAPI(
-        host=entry.data["host"],
-        username=entry.data["username"],
-        password=entry.data["password"],
-        session=session
-    )
+    # Dienst-Handler für die xAPI Steuerbefehle
+    async def handle_cisco_service(call: ServiceCall):
+        service = call.service
+        
+        if service == "dial":
+            target = call.data.get("target")
+            payload = f"<Command><Dial><Number>{target}</Number></Dial></Command>"
+            await send_xcommand(payload)
+            
+        elif service == "disconnect":
+            payload = "<Command><Call><Disconnect/></Call></Command>"
+            await send_xcommand(payload)
+            
+        elif service == "mute":
+            payload = "<Command><Audio><Microphones><Mute/></Microphones></Audio></Command>"
+            await send_xcommand(payload)
+            
+        elif service == "unmute":
+            payload = "<Command><Audio><Microphones><Unmute/></Microphones></Audio></Command>"
+            await send_xcommand(payload)
+            
+        elif service == "set_volume":
+            volume = call.data.get("volume")
+            payload = f"<Configuration><Audio><Sounds><Volume>{volume}</Volume></Sounds></Configuration>"
+            await send_xcommand(payload)
+            
+        elif service == "standby_activate":
+            payload = "<Command><Standby><Activate/></Standby></Command>"
+            await send_xcommand(payload)
+            
+        elif service == "standby_deactivate":
+            payload = "<Command><Standby><Deactivate/></Standby></Command>"
+            await send_xcommand(payload)
 
-    # Speichert die API-Instanz, damit services.py und sensor.py darauf zugreifen können
-    hass.data[DOMAIN][entry.entry_id] = {
-        "api": api
-    }
+    # Registrierung der Dienste in Home Assistant
+    hass.services.async_register(DOMAIN, "dial", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "disconnect", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "mute", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "unmute", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "set_volume", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "standby_activate", handle_cisco_service)
+    hass.services.async_register(DOMAIN, "standby_deactivate", handle_cisco_service)
 
-    # Leitet das Setup an deine Plattformen (z. B. sensor.py) weiter
-    # Falls PLATFORMS in deiner const.py fehlt, kannst du auch ["sensor"] direkt eintragen
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Registriere die neuen Dienste zur Steuerung (Dial, Mute, Volume, Standby etc.)
-    async_setup_services(hass)
-
-    _LOGGER.info("Cisco Video System Integration erfolgreich geladen.")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Entfernt einen Config Entry (wichtig bei Deinstallation/Neustart der Integration)."""
-    # Entfernt die Plattformen
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
-    if unload_ok:
-        # Bereinigt den globalen Speicher
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
+    """Entfernt einen Config Entry und deregistriert Dienste."""
+    # Optionale Logik zum Entfernen der Services bei Deaktivierung
+    for service in ["dial", "disconnect", "mute", "unmute", "set_volume", "standby_activate", "standby_deactivate"]:
+        hass.services.async_remove(DOMAIN, service)
+    return True
