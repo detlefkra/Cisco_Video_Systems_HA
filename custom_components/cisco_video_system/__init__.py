@@ -47,9 +47,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "host": host
     }
     
-    # WICHTIG: Registriert den Update-Listener für den Konfigurations-Button (OptionsFlow)
-    # Sobald Optionen gespeichert werden, wird 'async_reload_entry' aufgerufen.
-    entry.async_on_unload(entry.add_to_updates_listener(async_reload_entry))
+    # KORREKTUR: Registriert den Update-Listener für den Konfigurations-Button mit der richtigen Methode
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     
     # Automatisiertes Laden aller registrierten Plattformen (sensor, button, number)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
