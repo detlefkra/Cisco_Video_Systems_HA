@@ -1,9 +1,7 @@
+"""Cisco Video System Integration für Home Assistant."""
 import logging
-import xml.etree.ElementTree as ET
 import aiohttp
-import voluptuous as vol
-
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
@@ -20,10 +18,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     
-    # Weiterleitung an die Sensor-Plattformen
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Hilfsfunktion zum Senden der XML-Befehle an /putxml
+    # Zentrale Funktion zum Senden der XML-Befehle an /putxml
     async def send_xcommand(xml_payload: str):
         session = async_get_clientsession(hass)
         
@@ -46,58 +41,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except Exception as err:
             _LOGGER.error("Verbindungsfehler zur Cisco API: %s", err)
 
-    # Dienst-Handler für die xAPI Steuerbefehle
-    async def handle_cisco_service(call: ServiceCall):
-        service = call.service
-        
-        if service == "dial":
-            target = call.data.get("target")
-            payload = f"<Command><Dial><Number>{target}</Number></Dial></Command>"
-            await send_xcommand(payload)
-            
-        elif service == "disconnect":
-            payload = "<Command><Call><Disconnect/></Call></Command>"
-            await send_xcommand(payload)
-            
-        elif service == "mute":
-            payload = "<Command><Audio><Microphones><Mute/></Microphones></Audio></Command>"
-            await send_xcommand(payload)
-            
-        elif service == "unmute":
-            payload = "<Command><Audio><Microphones><Unmute/></Microphones></Audio></Command>"
-            await send_xcommand(payload)
-            
-        elif service == "set_volume":
-            volume = call.data.get("volume")
-            payload = f"<Configuration><Audio><Sounds><Volume>{volume}</Volume></Sounds></Configuration>"
-            await send_xcommand(payload)
-            
-        elif service == "standby_activate":
-            payload = "<Command><Standby><Activate/></Standby></Command>"
-            await send_xcommand(payload)
-            
-        elif service == "standby_deactivate":
-            payload = "<Command><Standby><Deactivate/></Standby></Command>"
-            await send_xcommand(payload)
-
-    # Registrierung der Dienste in Home Assistant
-    hass.services.async_register(DOMAIN, "dial", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "disconnect", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "mute", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "unmute", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "set_volume", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "standby_activate", handle_cisco_service)
-    hass.services.async_register(DOMAIN, "standby_deactivate", handle_cisco_service)
-
+    # Speichern des Befehls-Senders im Integrations-Kontext.
+    # Dadurch können button.py und number.py auf denselben Kommunikationskanal zugreifen.
+    hass.data[DOMAIN][entry.entry_id] = {
+        "send_command": send_xcommand,
+        "host": host
+    }
+    
+    # Automatisiertes Laden aller registrierten Plattformen (sensor, button, number)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Entfernt einen Config Entry und deregistriert Dienste sowie Plattformen."""
+    """Entfernt einen Config Entry und deregistriert alle Plattformen sauber."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
-        for service in ["dial", "disconnect", "mute", "unmute", "set_volume", "standby_activate", "standby_deactivate"]:
-            if hass.services.has_service(DOMAIN, service):
-                hass.services.async_remove(DOMAIN, service)
-                
+        # Speicherplatz nach dem Deinstallieren/Deaktivieren wieder freigeben
+        hass.data[DOMAIN].pop(entry.entry_id)
+        
     return unload_ok
