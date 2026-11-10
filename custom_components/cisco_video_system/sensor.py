@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -57,13 +58,22 @@ async def async_setup_entry(
     data = hass.data[DOMAIN][entry.entry_id]
     host = data["host"]
 
-    # Holt die Schlüssel der ausgewählten Sensoren aus den Optionen (z.B. ["room_temperature", "room_noise"])
-    # Falls das Feld leer oder neu ist, werden als Fallback einfach ALLE Sensoren geladen
+    # Holt die Schlüssel der ausgewählten Sensoren aus den Optionen
     selected_sensors = entry.options.get("selected_sensors", list(TARGET_PATHS.keys()))
 
+    # AUTOMATISCHES AUFRÄUMEN: Abgewählte Entitäten aus der Registry löschen
+    ent_reg = er.async_get(hass)
+    for key in TARGET_PATHS.keys():
+        if key not in selected_sensors:
+            unique_id = f"{entry.entry_id}_{key}"
+            # Findet die Entitäts-ID anhand der Unique ID
+            entity_id = ent_reg.async_get_entity_id("sensor", DOMAIN, unique_id)
+            if entity_id:
+                _LOGGER.info("Entferne abgewählten Sensor: %s", entity_id)
+                ent_reg.async_remove(entity_id)
+
+    # Verbleibende, aktive Sensoren aufbauen
     entities = []
-    
-    # Geht alle ausgewählten Sensoren durch und baut sie auf
     for key in selected_sensors:
         if key in TARGET_PATHS:
             xpath = TARGET_PATHS[key]
@@ -97,7 +107,7 @@ class CiscoConfigurableSensor(SensorEntity):
         elif "noise" in key:
             self._attr_native_unit_of_measurement = "dBA"
 
-        # Bietet die gemeinsame Geräte-Zuordnung
+        # Gemeinsame Geräte-Zuordnung
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=f"Cisco Video System ({host})",
