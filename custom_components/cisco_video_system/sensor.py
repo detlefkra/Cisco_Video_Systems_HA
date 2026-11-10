@@ -23,7 +23,8 @@ TARGET_PATHS = {
     "room_noise": "RoomAnalytics/AmbientNoise/Level/A",
     "room_people_count": "RoomAnalytics/PeopleCount/Current",
     "status_call_status": "SystemUnit/State/NumberOfActiveCalls",
-    "lightning_conditions": "RoomAnalytics/LightingConditions"
+    "lightning_conditions": "RoomAnalytics/LightingConditions",
+    "camra_lid": "State/CameraLid"
 }
 
 async def async_setup_entry(
