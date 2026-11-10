@@ -8,13 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_HOST, CONF_USERNAME, CONF_PASSWORD
 
-# Sicherer Import von DOMAIN und optional PLATFORMS aus der const.py
-try:
-    from .const import DOMAIN, PLATFORMS
-except ImportError:
-    from .const import DOMAIN
-    # Falls PLATFORMS in const.py fehlt, definieren wir es hier lokal (Standard für Sensoren)
-    PLATFORMS = ["sensor"]
+from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
     
-    # Weiterleitung an die Sensor-Plattformen (falls vorhanden)
+    # Weiterleitung an die Sensor-Plattformen
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Hilfsfunktion zum Senden der XML-Befehle an /putxml
