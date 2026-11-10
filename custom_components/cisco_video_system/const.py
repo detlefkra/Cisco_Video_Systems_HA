@@ -19,5 +19,5 @@ AVAILABLE_SENSORS = {
     "room_noise": "Noise",
     "room_people_count": "People",
     "status_call_status": "Active Calls",
-    "lightning_conditions": "LightingConditions"
+    "lightning_conditions": "Lighting Conditions"
 }
