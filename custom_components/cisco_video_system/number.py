@@ -6,6 +6,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -15,6 +16,7 @@ async def async_setup_entry(
     host = data["host"]
 
     async_add_entities([CiscoVolumeNumber(entry, host, send_command)])
+
 
 class CiscoVolumeNumber(NumberEntity):
     """Lautstärkeregler-Entität für das Cisco System."""
@@ -28,7 +30,7 @@ class CiscoVolumeNumber(NumberEntity):
         self._attr_native_max_value = 100
         self._attr_native_step = 1
         self._attr_native_value = 50  # Standard-Startwert (wird bei Updates überschrieben)
-        
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=f"Cisco Video System ({host})",
@@ -38,9 +40,8 @@ class CiscoVolumeNumber(NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Wird aufgerufen, wenn der Regler in HA verschoben wird."""
-        volume_int = int(value)
-        payload = f"<Configuration><Audio><Sounds><Volume>{volume_int}</Volume></Sounds></Configuration>"
+        volume_int = max(0, min(100, int(value)))
+        payload = f"<Command><Audio><Volume><Set><Level>{volume_int}</Level></Set></Volume></Audio></Command>"
         await self._send_command(payload)
-        self._attr_native_value = value
+        self._attr_native_value = float(volume_int)
         self.async_write_ha_state()
-
