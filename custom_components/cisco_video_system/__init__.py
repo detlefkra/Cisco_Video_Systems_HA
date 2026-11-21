@@ -19,6 +19,8 @@ SERVICES = (
     "set_volume",
     "standby_activate",
     "standby_deactivate",
+    "standby_halfwake",
+    "signage_show",
 )
 
 
@@ -96,6 +98,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def handle_standby_deactivate(call: ServiceCall) -> None:
         await _send_to_all("<Command><Standby><Deactivate/></Standby></Command>")
 
+    async def handle_standby_halfwake(call: ServiceCall) -> None:
+        await _send_to_all("<Command><Standby><Halfwake/></Standby></Command>")
+
+    async def handle_signage_show(call: ServiceCall) -> None:
+        await _send_to_all(
+            "<Configuration><Standby><Signage><Mode>On</Mode></Signage></Standby></Configuration>"
+        )
+        await _send_to_all("<Command><Standby><Halfwake/></Standby></Command>")
+
     # Dienste registrieren (falls noch nicht geschehen)
     if not hass.services.has_service(DOMAIN, "dial"):
         hass.services.async_register(DOMAIN, "dial", handle_dial)
@@ -105,6 +116,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.services.async_register(DOMAIN, "set_volume", handle_set_volume)
         hass.services.async_register(DOMAIN, "standby_activate", handle_standby_activate)
         hass.services.async_register(DOMAIN, "standby_deactivate", handle_standby_deactivate)
+        hass.services.async_register(DOMAIN, "standby_halfwake", handle_standby_halfwake)
+        hass.services.async_register(DOMAIN, "signage_show", handle_signage_show)
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
