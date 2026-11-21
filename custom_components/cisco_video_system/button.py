@@ -6,6 +6,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -21,9 +22,12 @@ async def async_setup_entry(
         CiscoButton(entry, host, send_command, "unmute", "Mikrofone einschalten", "mdi:microphone", "<Command><Audio><Microphones><Unmute/></Microphones></Audio></Command>"),
         CiscoButton(entry, host, send_command, "standby_activate", "Standby aktivieren", "mdi:power-sleep", "<Command><Standby><Activate/></Standby></Command>"),
         CiscoButton(entry, host, send_command, "standby_deactivate", "System aufwecken", "mdi:power", "<Command><Standby><Deactivate/></Standby></Command>"),
+        CiscoButton(entry, host, send_command, "input_2", "Input 1 aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>1</ConnectorId></Start></Presentation></Command>"),
+        CiscoButton(entry, host, send_command, "input_3", "Input 2 aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>2</ConnectorId></Start></Presentation></Command>"),
     ]
-    
+
     async_add_entities(buttons)
+
 
 class CiscoButton(ButtonEntity):
     """Repräsentiert einen Knopf auf der Cisco Geräteseite."""
@@ -34,7 +38,7 @@ class CiscoButton(ButtonEntity):
         self._attr_name = f"Cisco {name}"
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_icon = icon
-        
+
         # Das bindet die Entität fest an das Hauptgerät in Home Assistant
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
@@ -46,4 +50,3 @@ class CiscoButton(ButtonEntity):
     async def async_press(self) -> None:
         """Wird ausgeführt, wenn der Button in HA gedrückt wird."""
         await self._send_command(self._payload)
-
