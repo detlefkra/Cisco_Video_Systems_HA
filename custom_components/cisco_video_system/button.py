@@ -24,6 +24,7 @@ async def async_setup_entry(
         CiscoButton(entry, host, send_command, "standby_deactivate", "System aufwecken", "mdi:power", "<Command><Standby><Deactivate/></Standby></Command>"),
         CiscoButton(entry, host, send_command, "input_2", "Input USB-C aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>2</ConnectorId></Start></Presentation></Command>"),
         CiscoButton(entry, host, send_command, "input_3", "Input HDMI aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>3</ConnectorId></Start></Presentation></Command>"),
+        CiscoButton(entry, host, send_command, "presentation_stop", "Teilen beenden", "mdi:presentation-play", "<Command><Presentation><Stop/></Presentation></Command>"),
     ]
 
     async_add_entities(buttons)
