@@ -34,6 +34,8 @@ async def async_setup_entry(
 class CiscoVolumeNumber(NumberEntity):
     """Lautstärkeregler-Entität für das Cisco System."""
 
+    _attr_has_entity_name = True
+
     def __init__(self, hass, entry, host, username, password, send_command):
         self.hass = hass
         self._send_command = send_command
@@ -41,7 +43,7 @@ class CiscoVolumeNumber(NumberEntity):
         self._username = username
         self._password = password
 
-        self._attr_name = "Cisco Lautstärke"
+        self._attr_name = "Lautstärke"
         self._attr_unique_id = f"{entry.entry_id}_volume"
         self._attr_icon = "mdi:volume-high"
         self._attr_native_min_value = 0
