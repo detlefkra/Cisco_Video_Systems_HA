@@ -21,18 +21,6 @@ async def async_setup_entry(
         CiscoButton(entry, host, send_command, "unmute", "Mikrofone einschalten", "mdi:microphone", "<Command><Audio><Microphones><Unmute/></Microphones></Audio></Command>"),
         CiscoButton(entry, host, send_command, "standby_activate", "System Standby", "mdi:power-sleep", "<Command><Standby><Activate/></Standby></Command>"),
         CiscoButton(entry, host, send_command, "standby_halfwake", "System Halfwake", "mdi:television-ambient-light", "<Command><Standby><Halfwake/></Standby></Command>"),
-        CiscoButton(
-            entry,
-            host,
-            send_command,
-            "signage_show",
-            "System Digital Signage",
-            "mdi:television-guide",
-            [
-                "<Configuration><Standby><Signage><Mode>On</Mode></Signage></Standby></Configuration>",
-                "<Command><Standby><Halfwake/></Standby></Command>",
-            ],
-        ),
         CiscoButton(entry, host, send_command, "standby_deactivate", "System Wake", "mdi:power", "<Command><Standby><Deactivate/></Standby></Command>"),        
         CiscoButton(entry, host, send_command, "input_2", "Input USB-C aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>2</ConnectorId></Start></Presentation></Command>"),
         CiscoButton(entry, host, send_command, "input_3", "Input HDMI aktivieren", "mdi:video-input-hdmi", "<Command><Presentation><Start><ConnectorId>3</ConnectorId></Start></Presentation></Command>"),
