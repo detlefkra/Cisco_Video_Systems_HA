@@ -20,7 +20,6 @@ SERVICES = (
     "standby_activate",
     "standby_deactivate",
     "standby_halfwake",
-    "signage_show",
 )
 
 
@@ -117,7 +116,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.services.async_register(DOMAIN, "standby_activate", handle_standby_activate)
         hass.services.async_register(DOMAIN, "standby_deactivate", handle_standby_deactivate)
         hass.services.async_register(DOMAIN, "standby_halfwake", handle_standby_halfwake)
-        hass.services.async_register(DOMAIN, "signage_show", handle_signage_show)
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
