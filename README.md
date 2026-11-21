@@ -16,6 +16,7 @@ Nach erfolgreicher Einrichtung stellt diese Integration folgende Dienste zur Med
 *   `cisco_video_system.unmute`: Hebt die Stummschaltung auf.
 *   `cisco_video_system.set_volume`: Setzt die Systemlautstärke (Feld: `volume`, Bereich 0–100).
 *   `cisco_video_system.standby_activate`: Schaltet das System in den Standby-Modus.
+*   `cisco_video_system.halfwake_activate`: Schaltet das System in den Halfwake-Modus.
 *   `cisco_video_system.standby_deactivate`: Weckt das Gerät aus dem Standby auf.
 
 ## Installation
