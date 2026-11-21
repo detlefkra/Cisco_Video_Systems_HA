@@ -46,7 +46,3 @@ standby_deactivate:
 standby_halfwake:
   name: System Halfwake
   description: Versetzt das Videosystem in den Halfwake-Modus.
-
-signage_show:
-  name: Digital Signage anzeigen
-  description: Aktiviert Digital Signage und versetzt das System in den Halfwake-Modus.
